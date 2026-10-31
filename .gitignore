@@ -1,0 +1,10 @@
+generated_output/
+exported_formats/
+browser_profile/
+app.py
+article_history.db
+dashboard.py
+exporter.py
+note_poster.py
+run_dashboard.bat
+test_connection.py
