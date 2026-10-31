@@ -34,7 +34,12 @@ if "max_turns" not in st.session_state:
 # ==========================================
 # Gemini API 呼び出し関数
 # ==========================================
-def call_gemini_api(prompt_text):
+import time
+
+# ==========================================
+# Gemini API 呼び出し関数（自動リトライ付き）
+# ==========================================
+def call_gemini_api(prompt_text, max_retries=3):
     if not GEMINI_API_KEY:
         return "エラー: GEMINI_API_KEY が設定されていません。Streamlit CloudのSecretsまたは環境変数を確認してください。"
     
@@ -45,15 +50,25 @@ def call_gemini_api(prompt_text):
         "contents": [{"parts": [{"text": prompt_text}]}]
     }
     
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        if response.status_code == 200:
-            res_json = response.json()
-            return res_json["candidates"][0]["content"]["parts"][0]["text"]
-        else:
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            if response.status_code == 200:
+                res_json = response.json()
+                return res_json["candidates"][0]["content"]["parts"][0]["text"]
+            elif response.status_code == 503:
+                # 503エラー（一時的高負荷）の場合は少し待ってから再試行
+                if attempt < max_retries - 1:
+                    time.sleep(2 * (attempt + 1))  # 2秒、4秒と待機時間を増やす
+                    continue
             return f"APIエラー (ステータスコード: {response.status_code}): {response.text}"
-    except Exception as e:
-        return f"通信エラーが発生しました: {str(e)}"
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(2)
+                continue
+            return f"通信エラーが発生しました: {str(e)}"
+    
+    return "APIサーバーが一時的に混雑しています。少し時間を置いてから再度メッセージを送信してください。"
 
 # ==========================================
 # メイン UI 構成
